@@ -1,0 +1,724 @@
+package com.abhijeet.todoApp.ui.screens
+
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.selection.TextSelectionColors
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.NavigateNext
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.RadioButtonDefaults
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import coil3.compose.AsyncImage
+import io.github.ismoy.imagepickerkmp.domain.extensions.loadBytes
+import io.github.ismoy.imagepickerkmp.domain.models.GalleryPhotoResult
+import io.github.ismoy.imagepickerkmp.presentation.ui.components.GalleryPickerLauncher
+import com.abhijeet.todoApp.ui.components.TodoElevatedCard
+import com.abhijeet.todoApp.ui.components.TodoTextField
+import com.abhijeet.todoApp.ui.components.TodoTopAppBar
+import com.abhijeet.todoApp.ui.components.bounceClickable
+import com.abhijeet.todoApp.ui.screens.homescreen.components.showSnackBar
+import com.abhijeet.todoApp.ui.theme.BodyLarge
+import com.abhijeet.todoApp.ui.theme.BodyNormal
+import com.abhijeet.todoApp.ui.theme.BodySmall
+import com.abhijeet.todoApp.ui.theme.BodyXLarge
+import com.abhijeet.todoApp.ui.theme.H1TextStyle
+import com.abhijeet.todoApp.ui.theme.H2TextStyle
+import com.abhijeet.todoApp.ui.theme.Spacing
+import com.abhijeet.todoApp.ui.theme.TodoColors
+import com.abhijeet.todoApp.ui.uiutils.VSpacer
+import com.abhijeet.todoApp.ui.utils.UiEvent
+import com.abhijeet.todoApp.ui.viewModel.SettingsViewModel
+import org.jetbrains.compose.resources.painterResource
+import org.jetbrains.compose.resources.stringResource
+import org.koin.compose.koinInject
+import todo_list.composeapp.generated.resources.Res
+import todo_list.composeapp.generated.resources.cancel
+import todo_list.composeapp.generated.resources.settings_about
+import todo_list.composeapp.generated.resources.settings_about_desc
+import todo_list.composeapp.generated.resources.settings_add_name
+import todo_list.composeapp.generated.resources.settings_edit_name
+import todo_list.composeapp.generated.resources.settings_edit_name_photo
+import todo_list.composeapp.generated.resources.settings_feedback
+import todo_list.composeapp.generated.resources.settings_feedback_desc
+import todo_list.composeapp.generated.resources.settings_feedback_plac
+import todo_list.composeapp.generated.resources.settings_infocard_compl
+import todo_list.composeapp.generated.resources.settings_infocard_remain
+import todo_list.composeapp.generated.resources.settings_dark_mode
+import todo_list.composeapp.generated.resources.settings_dark_mode_desc
+import todo_list.composeapp.generated.resources.settings_report
+import todo_list.composeapp.generated.resources.settings_report_desc
+import todo_list.composeapp.generated.resources.settings_report_plac
+import todo_list.composeapp.generated.resources.settings_save_name
+import todo_list.composeapp.generated.resources.settings_title
+import todo_list.composeapp.generated.resources.submit
+import todo_list.composeapp.generated.resources.user_octagon
+
+
+@Composable
+@Preview
+fun SettingsScreen(
+    onNavigateToAboutUs: () -> Unit,
+    onBack: () -> Unit,
+    viewModel: SettingsViewModel = koinInject()
+) {
+    val uiState by viewModel.uiState.collectAsState()
+    val isDarkMode by viewModel.isDarkMode.collectAsState()
+
+    var name by remember { mutableStateOf("") }
+    var isEditing by remember { mutableStateOf(false) }
+    val focusRequester = remember { FocusRequester() }
+    var showDialog by remember { mutableStateOf(false) }
+    var showThemeDialog by remember { mutableStateOf(false) }
+    val isFeedback = remember { mutableStateOf(false) }
+
+    // Image picker state
+    var showGallery by remember { mutableStateOf(false) }
+    var selectedPhoto by remember { mutableStateOf<GalleryPhotoResult?>(null) }
+
+    // Sync name from database
+    LaunchedEffect(uiState.userProfile.name) {
+        if (name.isEmpty() && uiState.userProfile.name.isNotEmpty()) {
+            name = uiState.userProfile.name
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        viewModel.uiEvents.collect { event ->
+            when (event) {
+                is UiEvent.OnSuccess -> showSnackBar(event.message)
+                is UiEvent.ShowError -> showSnackBar(event.message, positiveMessage = false)
+                is UiEvent.OnIdle -> {}
+                is UiEvent.OnLoading -> {}
+            }
+        }
+    }
+
+    // Gallery picker
+    if (showGallery) {
+        GalleryPickerLauncher(
+            onPhotosSelected = { photos ->
+                selectedPhoto = photos.firstOrNull()
+                selectedPhoto?.let {
+                    // GalleryPhotoResult contains the image bytes in 'bytes' property
+                    viewModel.updateUserPhoto(it.loadBytes())
+                }
+                showGallery = false
+            },
+            onError = { showGallery = false },
+            onDismiss = { showGallery = false },
+            allowMultiple = false
+        )
+    }
+
+    LaunchedEffect(isEditing) {
+        if (isEditing) {
+            focusRequester.requestFocus()
+        }
+    }
+
+    Scaffold(
+        topBar = {
+            TodoTopAppBar(
+                modifier = Modifier.systemBarsPadding(),
+                title = stringResource(Res.string.settings_title),
+                onBack = onBack
+            )
+        }
+    ) { padding ->
+        TodoBackgroundScreen {
+            BoxWithConstraints(
+                modifier = Modifier
+                    .padding(padding)
+                    .fillMaxSize()
+                    .pointerInput(Unit) {
+                        detectTapGestures(onTap = {
+                            if (isEditing) {
+                                isEditing = false
+                            }
+                        })
+                    }
+            ) {
+                val screenHeight = maxHeight
+                val cardHeight = screenHeight * 0.15f
+
+                Column(
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    // Area A (30%) - Profile Section
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(0.3f),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        // Edit/Save Icon
+                        Box(
+                            modifier = Modifier
+                                .size(30.dp)
+                                .padding(top = 8.dp, end = 8.dp)
+                                .align(Alignment.TopEnd)
+                        ) {
+                            Icon(
+                                imageVector = if (isEditing) Icons.Default.Check else Icons.Default.Edit,
+                                contentDescription = if (isEditing) stringResource(Res.string.settings_save_name) else stringResource(Res.string.settings_edit_name),
+                                tint = if (isEditing) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier
+                                    .size(if (isEditing) 36.dp else 24.dp)
+                                    .align(Alignment.Center)
+                                    .bounceClickable {
+                                        if (isEditing) {
+                                            if (name.isEmpty()) {
+                                                // show a message to user
+                                                return@bounceClickable
+                                            }
+                                            viewModel.updateUserName(name)
+                                        }
+                                        isEditing = !isEditing
+                                    }
+                            )
+                        }
+
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            // Profile Image
+                            Box(
+                                modifier = Modifier
+                                    .size(100.dp)
+                                    .clip(CircleShape)
+                                    .clickable(enabled = isEditing) {
+                                        showGallery = true
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                val photoToDisplay = selectedPhoto?.loadBytes() ?: uiState.userProfile.photoData
+
+                                if (photoToDisplay != null) {
+                                    AsyncImage(
+                                        model = photoToDisplay,
+                                        contentDescription = "Profile Picture",
+                                        modifier = Modifier
+                                            .size(100.dp)
+                                            .clip(CircleShape),
+                                        contentScale = ContentScale.Crop
+                                    )
+                                } else {
+                                    Image(
+                                        painter = painterResource(Res.drawable.user_octagon),
+                                        contentDescription = "Profile Picture",
+                                        colorFilter = ColorFilter.tint(
+                                            color = TodoColors.Primary.color
+                                        ),
+                                        modifier = Modifier
+                                            .size(100.dp)
+                                            .clip(CircleShape),
+                                        contentScale = ContentScale.Crop
+                                    )
+                                }
+                            }
+
+                            VSpacer(Spacing.s4)
+
+                            // Name Section
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center
+                            ) {
+                                if (isEditing) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.Center,
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        TextField(
+                                            modifier = Modifier.focusRequester(focusRequester),
+                                            value = name,
+                                            onValueChange = {
+                                                if (it.length <= 13) {
+                                                    name = it
+                                                }
+                                            },
+                                            label = null,
+                                            colors = TextFieldDefaults.colors(
+                                                focusedContainerColor = Color.Transparent,
+                                                unfocusedContainerColor = Color.Transparent,
+                                                focusedIndicatorColor = Color.Transparent,
+                                                unfocusedIndicatorColor = Color.Transparent,
+                                                cursorColor = MaterialTheme.colorScheme.onSurface,
+                                                selectionColors = TextSelectionColors(
+                                                    handleColor = MaterialTheme.colorScheme.outline,
+                                                    backgroundColor = MaterialTheme.colorScheme.outline
+                                                )
+                                            ),
+                                            textStyle = H2TextStyle().copy(
+                                                fontWeight = FontWeight.Bold
+                                            ),
+                                            placeholder = {
+                                                Text(
+                                                    text = stringResource(Res.string.settings_add_name),
+                                                    style = H1TextStyle().copy(
+                                                        fontSize = 36.sp,
+                                                        fontStyle = FontStyle.Italic,
+                                                        color = Color.Gray
+                                                    ),
+                                                )
+                                            }
+                                        )
+                                        Spacer(modifier = Modifier.width(Spacing.s2))
+                                    }
+                                } else {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.Center,
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        if (name.isEmpty()) {
+                                            Text(
+                                                text = stringResource(Res.string.settings_edit_name_photo),
+                                                style = BodyXLarge().copy(
+                                                    fontWeight = FontWeight.Bold
+                                                ),
+                                            )
+                                        } else {
+                                            Text(
+                                                text = name,
+                                                style = H1TextStyle().copy(
+                                                    fontSize = 36.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = Color.Gray
+                                                ),
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.width(Spacing.s3))
+                                    }
+                                }
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Icon(
+                                    imageVector = Icons.Outlined.Edit,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                        }
+                    }
+
+                    // Area B (70%) - Content Section
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(0.7f)
+                    ) {
+                        Column(
+                            modifier = Modifier.fillMaxSize(),
+                        ) {
+                            TodoElevatedCard(
+                                modifier = Modifier.padding(horizontal = Spacing.s4)
+                            ) {
+                                // Stats Card
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(cardHeight)
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                    ) {
+                                        // Notes Count
+                                        Box(
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .fillMaxHeight(),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            InfoCard(
+                                                title = "${uiState.completedTodos}",
+                                                subtitle = stringResource(Res.string.settings_infocard_compl),
+                                                modifier = Modifier
+                                            )
+                                        }
+
+                                        // Divider
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxHeight()
+                                                .background(
+                                                    color = MaterialTheme.colorScheme.onBackground.copy(
+                                                        alpha = 0.3f
+                                                    )
+                                                )
+                                                .width(1.dp)
+                                        )
+
+                                        // TODOs Count
+                                        Box(
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .fillMaxHeight(),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            InfoCard(
+                                                title = "${uiState.incompleteTodos}",
+                                                subtitle = stringResource(Res.string.settings_infocard_remain),
+                                                modifier = Modifier
+                                            )
+                                        }
+                                    }
+
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(16.dp))
+
+                            // Action Buttons
+                            ThemeModeSelector(
+                                themeMode = resolveThemeMode(isDarkMode),
+                                onOpenThemeDialog = { showThemeDialog = true }
+                            )
+                            BorderButton(
+                                stringResource(Res.string.settings_about),
+                                onClick = {
+                                    onNavigateToAboutUs()
+                                },
+                                subtitle = stringResource(Res.string.settings_about_desc)
+                            )
+                            BorderButton(
+                                stringResource(Res.string.settings_feedback),
+                                onClick = {
+                                    showDialog = true
+                                    isFeedback.value = true
+                                },
+                                subtitle = stringResource(Res.string.settings_feedback_desc)
+                            )
+                            BorderButton(
+                                stringResource(Res.string.settings_report),
+                                onClick = {
+                                    showDialog = true
+                                    isFeedback.value = false
+                                },
+                                subtitle = stringResource(Res.string.settings_report_desc)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+
+        if (showDialog) {
+            TextFieldDialogue(
+                onDismissRequest = {
+                    showDialog = false
+                },
+                onSubmit = { bugDescription ->
+                    // Handle submission
+                },
+                isFeedbackClicked = isFeedback.value
+            )
+        }
+
+        if (showThemeDialog) {
+            ThemeSelectionDialog(
+                currentTheme = resolveThemeMode(isDarkMode),
+                onThemeSelected = { selectedTheme ->
+                    when (selectedTheme) {
+                        ThemeMode.Auto -> viewModel.resetToAuto()
+                        ThemeMode.Dark -> viewModel.toggleDarkMode(true)
+                        ThemeMode.Light -> viewModel.toggleDarkMode(false)
+                    }
+                    showThemeDialog = false
+                },
+                onDismiss = { showThemeDialog = false }
+            )
+        }
+    }
+}
+
+enum class ThemeMode(val label: String, val icon: String) {
+    Auto("Auto", "\uD83C\uDF10"),
+    Dark("Dark", "\uD83C\uDF19"),
+    Light("Light", "\u2600\uFE0F")
+}
+
+fun resolveThemeMode(isDarkMode: Boolean?): ThemeMode = when (isDarkMode) {
+    null -> ThemeMode.Auto
+    true -> ThemeMode.Dark
+    false -> ThemeMode.Light
+}
+
+@Composable
+private fun ThemeModeSelector(
+    themeMode: ThemeMode,
+    onOpenThemeDialog: () -> Unit
+) {
+    TodoElevatedCard(
+        modifier = Modifier.padding(horizontal = Spacing.s4),
+        onClick = onOpenThemeDialog
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column {
+                Text(
+                    text = stringResource(Res.string.settings_dark_mode),
+                    style = BodyLarge().copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = resolveThemeModeDescription(themeMode),
+                    style = BodySmall(),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "${themeMode.icon} ${themeMode.label}",
+                    style = BodyNormal(),
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.NavigateNext,
+                    contentDescription = "Change theme mode",
+                    tint = MaterialTheme.colorScheme.onSurface
+                )
+            }
+        }
+    }
+}
+
+fun resolveThemeModeDescription(themeMode: ThemeMode): String = when (themeMode) {
+    ThemeMode.Auto -> "Follows system theme"
+    ThemeMode.Dark -> "Always use dark theme"
+    ThemeMode.Light -> "Always use light theme"
+}
+
+@Composable
+private fun ThemeSelectionDialog(
+    currentTheme: ThemeMode,
+    onThemeSelected: (ThemeMode) -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = "Choose Theme Mode",
+                style = H2TextStyle().copy(fontWeight = FontWeight.Bold),
+                color = MaterialTheme.colorScheme.onSurface
+            )
+        },
+        text = {
+            Column {
+                ThemeMode.entries.forEach { theme ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .bounceClickable {
+                                onThemeSelected(theme)
+                            }
+                            .padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        RadioButton(
+                            selected = theme == currentTheme,
+                            onClick = { onThemeSelected(theme) },
+                            colors = RadioButtonDefaults.colors(
+                                selectedColor = MaterialTheme.colorScheme.primary,
+                                unselectedColor = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        )
+                        Text(
+                            text = "${theme.icon}  ${theme.label}",
+                            style = BodyNormal(),
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = resolveThemeModeDescription(currentTheme),
+                    style = BodySmall(),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+
+@Composable
+private fun BorderButton(
+    title: String,
+    onClick: () -> Unit,
+    subtitle: String
+) {
+    TodoElevatedCard(
+        modifier = Modifier.padding(horizontal = Spacing.s4),
+        onClick = onClick
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column {
+                Text(
+                    text = title,
+                    style = BodyLarge().copy(
+                        fontWeight = FontWeight.Bold
+                    ),
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = subtitle,
+                    style = BodySmall(),
+                    color = Color.Gray
+                )
+            }
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.NavigateNext,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurface
+            )
+        }
+    }
+}
+
+@Composable
+private fun InfoCard(
+    title: String,
+    subtitle: String,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier.padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text(
+            text = title,
+            style = H2TextStyle(),
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = subtitle,
+            style = BodyNormal(),
+            color = Color.Gray
+        )
+    }
+}
+
+@Composable
+private fun TextFieldDialogue(
+    onDismissRequest: () -> Unit,
+    onSubmit: (String) -> Unit,
+    isFeedbackClicked: Boolean
+) {
+    var text by remember { mutableStateOf("") }
+
+    AlertDialog(
+        containerColor = MaterialTheme.colorScheme.surface,
+        onDismissRequest = onDismissRequest,
+        title = {
+            Text(
+                if (isFeedbackClicked) stringResource(Res.string.settings_feedback) else stringResource(Res.string.settings_report),
+                style = BodyLarge()
+            )
+        },
+        text = {
+            TodoTextField(
+                value = text,
+                onValueChange = { text = it },
+                placeholder = if (isFeedbackClicked) stringResource(Res.string.settings_feedback_plac) else stringResource(Res.string.settings_report_plac),
+                modifier = Modifier.fillMaxWidth(),
+                focusedBorderColor = MaterialTheme.colorScheme.outline,
+                singleLine = false
+            )
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    onSubmit(text)
+                    onDismissRequest()
+                }
+            ) {
+                Text(
+                    stringResource(Res.string.submit),
+                    style = BodyNormal()
+                )
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismissRequest) {
+                Text(
+                    stringResource(Res.string.cancel),
+                    style = BodyNormal()
+                )
+            }
+        }
+    )
+}
+

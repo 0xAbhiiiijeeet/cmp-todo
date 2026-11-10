@@ -1,0 +1,121 @@
+package com.abhijeet.todoApp.ui.screens.homescreen.components
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
+import com.abhijeet.todoApp.ui.components.CurvedButton
+import com.abhijeet.todoApp.ui.components.CurvedButtonConfig
+import com.abhijeet.todoApp.ui.theme.BodyLarge
+import com.abhijeet.todoApp.ui.theme.BodyXLarge
+import com.abhijeet.todoApp.ui.theme.Spacing
+import com.abhijeet.todoApp.ui.theme.TodoColors
+import com.abhijeet.todoApp.ui.uiutils.HSpacer
+import com.abhijeet.todoApp.ui.uiutils.VSpacer
+import org.jetbrains.compose.resources.stringResource
+import todo_list.composeapp.generated.resources.Res
+import todo_list.composeapp.generated.resources.task_card
+import todo_list.composeapp.generated.resources.task_card_btn
+
+@Composable
+@Preview(showBackground = true)
+fun TaskProgressCard(
+    progress: Float = 0.7f,
+    onViewTaskClick: () -> Unit = {}
+) {
+    val progressPercentage = (progress * 100).toInt()
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(
+                color = TodoColors.Primary.color,
+                shape = RoundedCornerShape(Spacing.s6)
+            )
+            .padding(Spacing.s6)
+    ){
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column (
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(
+                    text = stringResource(Res.string.task_card),
+                    style = BodyLarge().copy(
+                        color = TodoColors.Light.color
+                    )
+                )
+                VSpacer(Spacing.s6)
+                CurvedButton(
+                    modifier = Modifier,
+                    onClick = onViewTaskClick,
+                    text = stringResource(Res.string.task_card_btn),
+                    buttonConfig = CurvedButtonConfig(
+                        cornerRadius = 40f,
+                        verticalBulgeFactor = 10f,
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        contentColor = MaterialTheme.colorScheme.onSurface,
+                        gradientShadowColor = Color.Transparent
+                    )
+                )
+            }
+            HSpacer(Spacing.s6)
+
+            //progress bar
+            Box(
+                modifier = Modifier.size(Spacing.s25),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator(
+                    progress = { progress },
+                    modifier = Modifier.size(Spacing.s25),
+                    strokeWidth = Spacing.s2,
+                    color = Color.White,
+                    trackColor = Color.White.copy(alpha = 0.2f)
+                )
+                Text(
+                    text = "$progressPercentage%",
+                    style = BodyXLarge().copy(
+                        fontWeight = FontWeight.Bold,
+                        color = TodoColors.Light.color
+                    )
+                )
+            }
+        }
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

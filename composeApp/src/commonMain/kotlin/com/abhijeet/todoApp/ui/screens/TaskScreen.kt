@@ -1,0 +1,176 @@
+package com.abhijeet.todoApp.ui.screens
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.abhijeet.todoApp.data.model.toScheduleTaskModel
+import com.abhijeet.todoApp.ui.components.CarouselCalendar
+import com.abhijeet.todoApp.ui.components.CurvedButton
+import com.abhijeet.todoApp.ui.components.CurvedButtonConfig
+import com.abhijeet.todoApp.ui.components.ScheduleTaskCard
+import com.abhijeet.todoApp.ui.components.TodoTopAppBar
+import com.abhijeet.todoApp.ui.theme.BodyLarge
+import com.abhijeet.todoApp.ui.theme.Spacing
+import com.abhijeet.todoApp.ui.theme.TodoColors
+import com.abhijeet.todoApp.ui.uiutils.HSpacer
+import com.abhijeet.todoApp.ui.uiutils.VSpacer
+import com.abhijeet.todoApp.ui.viewModel.TaskScreenViewModel
+import org.jetbrains.compose.resources.stringResource
+import org.koin.compose.koinInject
+import todo_list.composeapp.generated.resources.Res
+import todo_list.composeapp.generated.resources.no_tasks
+import todo_list.composeapp.generated.resources.tasks_all
+import todo_list.composeapp.generated.resources.tasks_done
+import todo_list.composeapp.generated.resources.tasks_going
+import todo_list.composeapp.generated.resources.tasks_todo
+import kotlin.time.ExperimentalTime
+
+@OptIn(ExperimentalTime::class, ExperimentalMaterial3Api::class)
+@Composable
+@Preview
+fun TaskScreen(
+    onNavigateToEditTask: (todoId: Long) -> Unit,
+    onBack: () -> Unit,
+    viewModel: TaskScreenViewModel = koinInject()
+) {
+    val uiState by viewModel.uiState.collectAsState()
+    val pullToRefreshState = rememberPullToRefreshState()
+
+    val chips = listOf(
+        stringResource(Res.string.tasks_all),
+        stringResource(Res.string.tasks_todo),
+        stringResource(Res.string.tasks_going),
+        stringResource(Res.string.tasks_done)
+    )
+
+    TodoBackgroundScreen {
+        PullToRefreshBox(
+            isRefreshing = uiState.isRefreshing,
+            onRefresh = viewModel::refresh,
+            state = pullToRefreshState,
+            modifier = Modifier.fillMaxSize(),
+            indicator = {
+                PullToRefreshDefaults.Indicator(
+                    state = pullToRefreshState,
+                    isRefreshing = uiState.isRefreshing,
+                    containerColor = TodoColors.LightPrimary.color,
+                    color = TodoColors.Primary.color,
+                    modifier = Modifier.align(Alignment.TopCenter)
+                )
+            }
+        ) {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            TodoTopAppBar(
+                modifier = Modifier.statusBarsPadding().systemBarsPadding(),
+                onBack = onBack
+            )
+
+            CarouselCalendar(
+                initialSelectedDate = uiState.selectedDate,
+                onDateSelected = { date ->
+                    viewModel.onDateSelected(date)
+                }
+            )
+            VSpacer(Spacing.s4)
+
+            LazyRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                itemsIndexed(chips) { idx, title ->
+                    val curr = chips[idx]
+                    if (idx == 0) HSpacer(Spacing.s4)
+
+                    CurvedButton(
+                        modifier = Modifier.width(100.dp).height(40.dp),
+                        text = title,
+                        buttonConfig = CurvedButtonConfig(
+                            containerColor = if (curr == uiState.selectedFilter) TodoColors.Primary.color else TodoColors.LightPrimary.color,
+                            contentColor = if (curr == uiState.selectedFilter) TodoColors.Light.color else TodoColors.Primary.color,
+                            fontSize = 14.sp,
+                            verticalBulgeFactor = 8f,
+                            cornerRadius = 28f,
+                            gradientShadowColor = Color.Transparent
+                        )
+                    ) {
+                        viewModel.onFilterSelected(title)
+                    }
+
+                    if (idx == chips.lastIndex) {
+                        HSpacer(Spacing.s4)
+                    }
+                }
+            }
+            VSpacer(Spacing.s4)
+
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = Spacing.s4)
+            ) {
+                if (uiState.filteredTodos.isEmpty()) {
+                    item {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = Spacing.s12),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = stringResource(Res.string.no_tasks),
+                                style = BodyLarge().copy(
+                                    color = TodoColors.Secondary.color,
+                                    textAlign = TextAlign.Center
+                                )
+                            )
+                        }
+                    }
+                } else {
+                    items(
+                        items = uiState.filteredTodos,
+                        key = { it.id }
+                    ) { todo ->
+                        ScheduleTaskCard(
+                            task = todo.toScheduleTaskModel(),
+                            onClick = {
+                                onNavigateToEditTask(todo.id)
+                            }
+                        )
+                    }
+                }
+            }
+        }
+        } // end PullToRefreshBox
+
+    }
+}

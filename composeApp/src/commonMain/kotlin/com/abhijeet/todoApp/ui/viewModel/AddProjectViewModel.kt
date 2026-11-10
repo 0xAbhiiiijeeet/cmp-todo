@@ -1,0 +1,166 @@
+package com.abhijeet.todoApp.ui.viewModel
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.abhijeet.todoApp.data.local.TodoDao
+import com.abhijeet.todoApp.data.model.TaskCategory
+import com.abhijeet.todoApp.data.model.TaskGroupCategory
+import com.abhijeet.todoApp.data.model.TaskPriority
+import com.abhijeet.todoApp.data.model.TaskStatus
+import com.abhijeet.todoApp.data.model.TodoItem
+import com.abhijeet.todoApp.ui.utils.UiEvent
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
+
+data class AddProjectUiState(
+    val title: String = "",
+    val description: String = "",
+    val selectedGroupCategory: TaskGroupCategory = TaskGroupCategory.DailyStudy,
+    val startDate: String? = null,
+    val endDate: String? = null,
+    val priority: TaskPriority = TaskPriority.MEDIUM,
+    val isLoading: Boolean = false,
+)
+
+sealed class AddProjectUiEvent{
+    data class OnTitleChanged(val title: String) : AddProjectUiEvent()
+    data class OnDescriptionChanged(val description: String): AddProjectUiEvent()
+    data class OnStartDateChanged(val startDate: String) : AddProjectUiEvent()
+    data class OnEndDateChanged(val endDate: String) : AddProjectUiEvent()
+    data class OnCategoryChanged(val category: TaskGroupCategory) : AddProjectUiEvent()
+    object OnSaveProjectUi : AddProjectUiEvent()
+    object OnUiReset : AddProjectUiEvent()
+
+}
+class AddProjectViewModel(
+    private val todoDao: TodoDao
+) : ViewModel() {
+
+    private val _uiState = MutableStateFlow(AddProjectUiState())
+    val uiState: StateFlow<AddProjectUiState> = _uiState.asStateFlow()
+
+
+    private val _uiEvents = Channel<UiEvent>()
+    // Expose as a Flow
+    val uiEvents = _uiEvents.receiveAsFlow()
+
+
+    fun onEvent(event: AddProjectUiEvent) {
+        when (event) {
+            is AddProjectUiEvent.OnSaveProjectUi -> {
+                saveProject()
+            }
+            is AddProjectUiEvent.OnCategoryChanged -> {
+                updateGroupCategory(event.category)
+            }
+            is AddProjectUiEvent.OnDescriptionChanged -> {
+                updateDescription(event.description)
+            }
+            is AddProjectUiEvent.OnEndDateChanged -> {
+                updateEndDate(event.endDate)
+            }
+            is AddProjectUiEvent.OnStartDateChanged -> {
+                updateStartDate(event.startDate)
+            }
+            is AddProjectUiEvent.OnTitleChanged -> {
+                updateTitle(event.title)
+            }
+            is AddProjectUiEvent.OnUiReset -> {
+                resetState()
+            }
+        }
+    }
+
+    private fun updateTitle(title: String) {
+        _uiState.update { it.copy(title = title) }
+    }
+
+    private fun updateDescription(description: String) {
+        _uiState.update { it.copy(description = description) }
+    }
+
+    private fun updateGroupCategory(category: TaskGroupCategory) {
+        _uiState.update { it.copy(selectedGroupCategory = category) }
+    }
+
+    private fun updateStartDate(date: String) {
+        _uiState.update { it.copy(startDate = date) }
+    }
+
+    private fun updateEndDate(date: String) {
+        _uiState.update { it.copy(endDate = date) }
+    }
+
+    private fun mapGroupCategoryToTaskCategory(groupCategory: TaskGroupCategory): TaskCategory {
+        return when (groupCategory) {
+            TaskGroupCategory.OfficeProject -> TaskCategory.Office
+            TaskGroupCategory.PersonalProject -> TaskCategory.Personal
+            TaskGroupCategory.DailyStudy -> TaskCategory.Study
+            TaskGroupCategory.Other -> TaskCategory.Other
+        }
+    }
+
+    @OptIn(ExperimentalTime::class)
+    private fun saveProject() {
+        val state = _uiState.value
+
+        //validate State
+        when {
+            state.title.isBlank() -> {
+                viewModelScope.launch {
+                    _uiEvents.send(UiEvent.ShowError("Title cannot be empty"))
+                    return@launch
+                }
+                return
+            }
+            state.startDate.isNullOrEmpty() -> {
+                viewModelScope.launch {
+                    _uiEvents.send(UiEvent.ShowError("Start Date cannot be empty"))
+                    return@launch
+                }
+                return
+            }
+        }
+
+        _uiState.update { it.copy(isLoading = true) }
+
+        viewModelScope.launch {
+            try {
+                val todoItem = TodoItem(
+                    title = state.title,
+                    description = state.description,
+                    category = mapGroupCategoryToTaskCategory(state.selectedGroupCategory),
+                    groupCategory = state.selectedGroupCategory,
+                    scheduledDate = state.startDate,
+                    priority = state.priority,
+                    status = TaskStatus.TO_DO,
+                    createdAt = Clock.System.now(),
+                    updatedAt = Clock.System.now()
+                )
+
+                todoDao.insert(todoItem)
+                _uiState.update { it.copy(isLoading = false) }
+                _uiEvents.send(UiEvent.OnSuccess("Project saved Successfully"))
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                    )
+                }
+                _uiEvents.send(UiEvent.ShowError("Failed to save project: ${e.message}"))
+                return@launch
+            }
+        }
+    }
+
+    private fun resetState() {
+        _uiState.value = AddProjectUiState()
+    }
+}

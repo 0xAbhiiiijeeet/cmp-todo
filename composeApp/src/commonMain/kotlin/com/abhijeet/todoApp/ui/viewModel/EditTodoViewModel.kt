@@ -1,0 +1,210 @@
+package com.abhijeet.todoApp.ui.viewModel
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.abhijeet.todoApp.data.local.TodoDao
+import com.abhijeet.todoApp.data.model.TaskCategory
+import com.abhijeet.todoApp.data.model.TaskGroupCategory
+import com.abhijeet.todoApp.data.model.TaskPriority
+import com.abhijeet.todoApp.data.model.TaskStatus
+import com.abhijeet.todoApp.ui.utils.UiEvent
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
+
+data class EditTodoUiState(
+    val todoId: Long = 0,
+    val title: String = "",
+    val description: String = "",
+    val selectedGroupCategory: TaskGroupCategory = TaskGroupCategory.DailyStudy,
+    val selectedStatus: TaskStatus = TaskStatus.TO_DO,
+    val startDate: String? = null,
+    val endDate: String? = null,
+    val priority: TaskPriority = TaskPriority.MEDIUM,
+    val isLoading: Boolean = false,
+    val isSaved: Boolean = false,
+    val isDeleted: Boolean = false
+)
+
+sealed class EditTodoEvent {
+    data class OnTitleChanged(val title: String) : EditTodoEvent()
+    data class OnDescriptionChanged(val description: String) : EditTodoEvent()
+    data class OnStartDateChanged(val date: String) : EditTodoEvent()
+    data class OnEndDateChanged(val date: String) : EditTodoEvent()
+    data class OnCategoryChanged(val category: TaskGroupCategory) : EditTodoEvent()
+    data class LoadTodo(val todoId: Long) : EditTodoEvent()
+    data class OnStatusChanged(val status: TaskStatus) : EditTodoEvent()
+    data class OnPriorityChanged(val priority: TaskPriority) : EditTodoEvent()
+    object OnUiReset : EditTodoEvent()
+    object OnSaveTodo : EditTodoEvent()
+    object OnDeleteTodo : EditTodoEvent()
+}
+
+
+class EditTodoViewModel(
+    private val todoDao: TodoDao
+) : ViewModel() {
+    private val _uiState = MutableStateFlow(EditTodoUiState())
+    val uiState: StateFlow<EditTodoUiState> = _uiState.asStateFlow()
+    private val _uiEvents = Channel<UiEvent>()
+    // Expose as a Flow
+    val uiEvents = _uiEvents.receiveAsFlow()
+    fun onEvent(event: EditTodoEvent) {
+        when (event) {
+            is EditTodoEvent.LoadTodo -> {
+                loadTodo(event.todoId)
+            }
+            is EditTodoEvent.OnSaveTodo -> {
+                saveTodo()
+            }
+            is EditTodoEvent.OnDeleteTodo -> {
+                deleteTodo()
+            }
+            is EditTodoEvent.OnDescriptionChanged -> {
+                updateDescription(event.description)
+            }
+            is EditTodoEvent.OnTitleChanged -> {
+                updateTitle(event.title)
+            }
+            is EditTodoEvent.OnCategoryChanged -> {
+                updateGroupCategory(event.category)
+            }
+            is EditTodoEvent.OnPriorityChanged -> {
+                updatePriority(event.priority)
+            }
+            is EditTodoEvent.OnStatusChanged -> {
+                updateStatus(event.status)
+            }
+            is EditTodoEvent.OnStartDateChanged -> {
+                updateStartDate(event.date)
+            }
+            is EditTodoEvent.OnEndDateChanged -> {
+                updateEndDate(event.date)
+            }
+            is EditTodoEvent.OnUiReset -> {
+                resetState()
+            }
+        }
+    }
+    private fun loadTodo(todoId: Long) {
+        viewModelScope.launch {
+            try {
+                val todo = todoDao.getById(todoId)
+                if (todo != null) {
+                    _uiState.update {
+                        it.copy(
+                            todoId = todo.id,
+                            title = todo.title,
+                            description = todo.description,
+                            selectedGroupCategory = todo.groupCategory,
+                            selectedStatus = todo.status,
+                            startDate = todo.scheduledDate,
+                            endDate = null,
+                            priority = todo.priority
+                        )
+                    }
+                } else {
+                    _uiEvents.send(UiEvent.ShowError("Todo not found"))
+                }
+            } catch (e: Exception) {
+                _uiEvents.send(UiEvent.OnSuccess("Failed to load todo: ${e.message}"))
+            }
+        }
+    }
+    private fun updateTitle(title: String) {
+        _uiState.update { it.copy(title = title) }
+    }
+    private fun updateDescription(description: String) {
+        _uiState.update { it.copy(description = description) }
+    }
+    private fun updateGroupCategory(category: TaskGroupCategory) {
+        _uiState.update { it.copy(selectedGroupCategory = category) }
+    }
+    private fun updateStatus(status: TaskStatus) {
+        _uiState.update { it.copy(selectedStatus = status) }
+    }
+    private fun updateStartDate(date: String) {
+        _uiState.update { it.copy(startDate = date) }
+    }
+    private fun updateEndDate(date: String) {
+        _uiState.update { it.copy(endDate = date) }
+    }
+    private fun updatePriority(priority: TaskPriority) {
+        _uiState.update { it.copy(priority = priority) }
+    }
+    private fun mapGroupCategoryToTaskCategory(groupCategory: TaskGroupCategory): TaskCategory {
+        return when (groupCategory) {
+            TaskGroupCategory.OfficeProject -> TaskCategory.Office
+            TaskGroupCategory.PersonalProject -> TaskCategory.Personal
+            TaskGroupCategory.DailyStudy -> TaskCategory.Study
+            TaskGroupCategory.Other -> TaskCategory.Other
+        }
+    }
+    @OptIn(ExperimentalTime::class)
+    private fun saveTodo() {
+        val state = _uiState.value
+
+        if (state.title.isBlank()) {
+            viewModelScope.launch {
+                _uiEvents.send(UiEvent.OnSuccess("Title cannot be empty"))
+            }
+            return
+        }
+
+        _uiState.update { it.copy(isLoading = true) }
+
+        viewModelScope.launch {
+            try {
+                val existingTodo = todoDao.getById(state.todoId)
+                if (existingTodo != null) {
+                    val updatedTodo = existingTodo.copy(
+                        title = state.title,
+                        description = state.description,
+                        category = mapGroupCategoryToTaskCategory(state.selectedGroupCategory),
+                        groupCategory = state.selectedGroupCategory,
+                        status = state.selectedStatus,
+                        scheduledDate = state.startDate,
+                        priority = state.priority,
+                        updatedAt = Clock.System.now(),
+                        completed = state.selectedStatus == TaskStatus.DONE,
+                        completedAt = if (state.selectedStatus == TaskStatus.DONE) Clock.System.now() else null
+                    )
+                    todoDao.update(updatedTodo)
+                    _uiState.update { it.copy(isLoading = false, isSaved = true) }
+                } else {
+                    _uiEvents.send(UiEvent.ShowError("Todo Not found!"))
+                    _uiState.update { it.copy(isLoading = false) }
+                }
+            } catch (e: Exception) {
+                _uiEvents.send(UiEvent.ShowError("Failed to update todo:  ${e.message}"))
+            }
+        }
+    }
+    private fun deleteTodo() {
+        _uiState.update { it.copy(isLoading = true) }
+
+        viewModelScope.launch {
+            try {
+                todoDao.deleteById(_uiState.value.todoId)
+                _uiState.update { it.copy(isLoading = false, isDeleted = true) }
+            } catch (e: Exception) {
+                _uiEvents.send(UiEvent.ShowError("Failed to delete todo: ${e.message}"))
+
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                    )
+                }
+            }
+        }
+    }
+    private fun resetState() {
+        _uiState.update { EditTodoUiState() }
+    }
+}

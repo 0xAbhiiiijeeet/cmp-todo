@@ -1,0 +1,99 @@
+package com.abhijeet.todoApp.ui.screens.homescreen.components
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
+import com.abhijeet.todoApp.data.model.InProgressTask
+import com.abhijeet.todoApp.data.model.TaskCategory
+import com.abhijeet.todoApp.ui.theme.BodyLarge
+import com.abhijeet.todoApp.ui.theme.BodySmall
+import com.abhijeet.todoApp.ui.theme.Spacing
+import com.abhijeet.todoApp.ui.theme.TodoColors
+import com.abhijeet.todoApp.ui.uiutils.VSpacer
+import org.jetbrains.compose.resources.stringResource
+import todo_list.composeapp.generated.resources.Res
+import todo_list.composeapp.generated.resources.jetpack_compose
+
+@Composable
+@Preview
+fun InProgressTaskCard(
+    task: InProgressTask = InProgressTask(
+        id = "1",
+        title = stringResource(Res.string.jetpack_compose),
+        category = TaskCategory.Personal,
+        progressPercentage = 0.5f,
+    )
+) {
+    Box(
+        modifier = Modifier
+            .height(Spacing.s30)
+            .width(Spacing.s55)
+            .shadow(
+                elevation = 6.dp,
+                shape = RoundedCornerShape(Spacing.s4),
+                ambientColor = TodoColors.Black.color.copy(alpha = 0.05f),
+                spotColor = TodoColors.Black.color.copy(alpha = 0.12f)
+            )
+            .background(
+                color = task.category.backgroundColor,
+                shape = RoundedCornerShape(Spacing.s4)
+            )
+            .padding(Spacing.s4)
+    ){
+        Column(
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(
+                text = task.category.displayName,
+                style = BodySmall().copy(
+                    color = TodoColors.Secondary.color
+                )
+            )
+            VSpacer(Spacing.s2)
+            //Task Title
+            Text(
+                text = task.title,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                style = BodyLarge().copy(
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Start
+                )
+            )
+            VSpacer(Spacing.s3)
+            LinearProgressIndicator(
+                modifier = Modifier.fillMaxWidth(),
+                progress = { task.progressPercentage },
+                trackColor = TodoColors.GreyBackground.color,
+                color = task.category.progressColor
+            )
+        }
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
